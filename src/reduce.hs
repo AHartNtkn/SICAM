@@ -9,7 +9,7 @@
 
 -- stack exec --package clash-ghc -- clashi
 
-module Main where
+module Reduce where
 
 import Data.Int
 import Data.Proxy
@@ -291,12 +291,15 @@ equInteraction
   (k2, p2, ans) = 
   Just (k2, a1, ans) :> repeat Nothing
 
+type ScreenInstruction nam = NumFormat nam
+
 screenCheck x y = (x == Scr) && (y == Num || y == Key)
 
 screenInteraction :: KnownNat nam
                   => Node nam 
                   -> Node nam 
-                  -> Vec 2 (Maybe (Node nam))
+                  -> ( Vec 2 (Maybe (Node nam))
+                     , ScreenInstruction nam )
 screenInteraction 
   (k1, p1, (d1, a1 :> b1 :> Nil))
   (k2, p2, (d2, a2 :> b2 :> Nil)) = 
@@ -381,8 +384,9 @@ interaction :: forall nam . (KnownNat nam)
          -> Vec 2 (Maybe (Node nam))
          -> NumFormat nam
          -> ( Vec 4 (Maybe (Node nam))
-            , Maybe (Index (2 ^ nam)) )
-interaction _ _ p@(_ :> Nothing :> Nil) _ = (p ++ repeat Nothing, Nothing)
+            , Maybe (Index (2 ^ nam))
+            , Maybe (ScreenInstruction nam))
+interaction _ _ p@(_ :> Nothing :> Nil) _ = (p ++ repeat Nothing, Nothing, Nothing)
 interaction key mt p@(Just (a'@(x', _, _)) :> Just (b'@(y', _, _)) :> Nil) n =
   let
     (a, x, b, y) = if interactionSwap x' y'
@@ -390,25 +394,25 @@ interaction key mt p@(Just (a'@(x', _, _)) :> Just (b'@(y', _, _)) :> Nil) n =
                     else (a', x', b', y')
   in
   if duplicationCheck x y
-  then (duplicationInteraction mt a b, Nothing)
+  then (duplicationInteraction mt a b, Nothing, Nothing)
 
-  else (\(x, y) -> (x ++ repeat Nothing, y)) $
+  else (\(x, y, z) -> (x ++ repeat Nothing, y, z)) $
     if equCheck x
-    then (equInteraction a b, Nothing)
+    then (equInteraction a b, Nothing, Nothing)
 
     else if annihilationCheck x y
-    then (annihilationInteraction a b, Nothing)
+    then (annihilationInteraction a b, Nothing, Nothing)
 
     else if aluCheck x y
-    then aluInteraction a b n
+    then (\(x, y) -> (x, y, Nothing)) $ aluInteraction a b n
 
     else if keyCheck x
-    then (keyInteraction key a b, Nothing)
+    then (keyInteraction key a b, Nothing, Nothing)
 
     else if screenCheck x y
-    then (screenInteraction a b, Nothing)
+    then (\(x, y) -> (x, Nothing, Just y)) $ screenInteraction a b
 
-    else (p, Nothing)
+    else (p, Nothing, Nothing)
 
 
 -- Find all the equations and what they point to.
@@ -621,7 +625,8 @@ machineCycle n mem key =
 
       outMem' :: Vec (2 ^ nam) (Vec 4 (Maybe (Node nam)))
       usedNums :: Vec (2 ^ nam) (Maybe (Index (2 ^ nam)))
-      (outMem', usedNums) = unzip $ zipWith3 (interaction key) freeNames inter secondNums
+      scrInstr :: Vec (2 ^ nam) (Maybe (ScreenInstruction nam))
+      (outMem', usedNums, scrInstr) = unzip3 $ zipWith3 (interaction key) freeNames inter secondNums
 
       outMem :: Vec (4 * 2 ^ nam) (Maybe (Node nam))
       outMem = concat $ scatterWithGarbage 
