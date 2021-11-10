@@ -1,0 +1,16 @@
+let gsTestData :: Vec (2 ^ 6) (Maybe (Index (2 ^ 6))) = Nothing:>Just 1:>Just 2:>Just 3:>Nothing:>Nothing:>Just 6:>Just 7:>Nothing:>   Nothing:>Just 10:>Just 11:>Nothing:>Just 13:>Just 14:>Just 15:>Nothing:>Nothing:> Nothing:>Nothing:>Nothing:>Just 21:>Nothing:>Nothing:>Nothing:>Nothing:>Nothing:> Nothing:>Just 28:>Nothing:>Just 30:>Just 31:>Just 32:>Nothing:>Nothing:>Just 35:> Nothing:>Nothing:>Just 38:>Nothing:>Nothing:>Nothing:>Just 42:>Just 43:>Nothing:> Nothing:>Just 46:>Just 47:>Just 48:>Just 49:>Just 50:>Just 51:>Just 52:>Just 53:> Nothing:>Just 55:>Nothing:>Nothing:>Just 58:>Just 59:>Just 60:>Nothing:>Nothing:> Just 63:>Nil
+
+gTest = unknownGather gsTestData
+
+let gsTestDataO :: Vec (2 ^ 6) (Maybe (Unsigned 1)) = Just 1:>Nothing:>Just 1:>Just 1:>Nothing:>Nothing:>Just 1:>Just 1:>Just 1:> Nothing:>Just 1:>Nothing:>Just 1:>Nothing:>Nothing:>Just 1:>Just 1:>Nothing:> Just 1:>Just 1:>Nothing:>Nothing:>Just 1:>Just 1:>Just 1:>Nothing:>Just 1:> Just 1:>Just 1:>Just 1:>Nothing:>Nothing:>Nothing:>Just 1:>Just 1:>Just 1:> Nothing:>Nothing:>Nothing:>Just 1:>Nothing:>Just 1:>Just 1:>Nothing:>Nothing:> Nothing:>Nothing:>Just 1:>Nothing:>Nothing:>Nothing:>Just 1:>Nothing:>Just 1:> Nothing:>Nothing:>Just 1:>Just 1:>Nothing:>Nothing:>Just 1:>Nothing:>Just 1:> Just 1:>Nil
+
+let gsTest = unknownGatherScatter gsTestData gsTestDataO
+
+
+
+let gsTestDataO2 :: Vec (2 ^ 6) (Maybe Int) = Just 100:>Nothing:>Nothing:>Just 103:>Just 104:>Just 105:>Nothing:>Just 107:>Nothing:>Nothing:>Just 110:>Nothing:>Nothing:>Nothing:>Nothing:>Nothing:>Just 116:>Nothing:>Just 118:>Nothing:>Just 120:>Just 121:>Just 122:>Just 123:>Nothing:>Nothing:>Nothing:>Just 127:>Just 128:>Just 129:>Nothing:>Nothing:>Just 132:>Nothing:>Just 134:>Nothing:>Just 136:>Just 137:>Nothing:>Just 139:>Nothing:>Nothing:>Just 142:>Nothing:>Nothing:>Just 145:>Nothing:>Nothing:>Just 148:>Just 149:>Just 150:>Just 151:>Just 152:>Just 153:>Nothing:>Just 155:>Nothing:>Nothing:>Nothing:>Just 159:>Nothing:>Nothing:>Nothing:>Just 163:>Nil
+
+let gsTest2 = unknownGatherScatter gsTestData gsTestDataO2
+
+
+Note: Seems to work as intended as of (21-10-28).
