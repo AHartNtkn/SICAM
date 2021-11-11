@@ -178,6 +178,7 @@ numUnformat = bitCoerce
 -- True for addresses, False for data.
 type Node nam = (Kind, Index (2 ^ nam), (Bool, Vec 2 (Index (2 ^ nam))))
 type Memory nam mem = Vec (2 ^ mem) (Maybe (Node nam))
+type Screen scrh scrw col = Vec (2 ^ scrh) (Vec (2 ^ scrw) (Vec 3 (BitVector col)))
 
 unpackMemory :: forall nam mem . (KnownNat nam, KnownNat mem)
   => Memory nam mem
@@ -258,8 +259,8 @@ duplicationInteraction :: KnownNat nam
   -> Node nam
   -> Vec 4 (Maybe (Node nam))
 duplicationInteraction mt
-  (k1, p1, (d1, a1 :> b1 :> Nil))
-  (k2, p2, (d2, a2 :> b2 :> Nil)) = 
+  x@(k1, p1, (d1, a1 :> b1 :> Nil))
+  y@(k2, p2, (d2, a2 :> b2 :> Nil)) = 
   case (d1, d2) of
     (True, True) -> 
       case mt of
@@ -269,7 +270,7 @@ duplicationInteraction mt
           Just (k2, a1, (True, n1 :> n2 :> Nil)) :>
           Just (k2, b1, (True, p1 :> n3 :> Nil)) :>
           Nil
-        Nothing -> undefined
+        Nothing -> Just x :> Just y :> repeat Nothing
     (True, False) ->
       Just (k2, a1, (False, a2 :> b2 :> Nil)) :>
       Just (k2, b1, (False, a2 :> b2 :> Nil)) :>
@@ -585,12 +586,44 @@ scatterFreeNames _ mem ints =
       out = scatterWithGarbage (repeat Nothing) ddups (map dnamsMap dnams' ++ repeat @k2 Nothing)
   in out
 
-aluExecute :: forall nam mem . (KnownNat nam, KnownNat mem)
-  => Memory nam mem
-  -> Memory nam mem
-aluExecute = id
+screenExecute :: forall k3 n nam scrh scrw col .
+  ( KnownNat nam
+  , KnownNat scrh
+  , KnownNat scrw
+  , KnownNat col
+  , KnownNat k3
+  , (scrh + scrw + 3 * col + k3) ~ (2 * nam)
+  )
+  => Vec (2 ^ nam) (Maybe (ScreenInstruction nam))
+  -> Screen scrh scrw col
+  -> Screen scrh scrw col
+screenExecute instr scr =
+  let fscr :: Vec (2 ^ (scrh + scrw)) (Vec 3 (BitVector col))
+      fscr = concat $ scr
 
-machineCycle :: forall k1 k2 n nam mem thrd . 
+      scInstrProc0 :: ScreenInstruction nam
+                   -> Vec (scrh + scrw + 3 * col) Bit
+      scInstrProc0 = take SNat . bitCoerce
+
+      scInstrProc1 :: Vec (scrh + scrw + 3 * col) Bit
+                   -> (Index (2 ^ (scrh + scrw)), Vec 3 (BitVector col))
+      scInstrProc1 = bitCoerce
+
+      scInstrProc :: Maybe (ScreenInstruction nam)
+                  -> (Index (2 ^ (scrh + scrw) + 1), Vec 3 (BitVector col))
+      scInstrProc Nothing = (maxBound, repeat 0) 
+      scInstrProc (Just n) = case scInstrProc1 (scInstrProc0 n) of
+        (i, c) -> (resize i, c)
+
+      idxs :: Vec (2 ^ nam) (Index (2 ^ (scrh + scrw) + 1))
+      pxls :: Vec (2 ^ nam) (Vec 3 (BitVector col))
+      (idxs, pxls) = unzip $ map scInstrProc instr
+
+      fscr' :: Vec (2 ^ (scrh + scrw)) (Vec 3 (BitVector col))
+      fscr' = scatterWithGarbage fscr idxs pxls
+  in unconcat SNat fscr'
+
+machineCycle :: forall k1 k2 k3 n nam mem thrd scrh scrw col . 
   ( KnownNat nam
   , KnownNat mem
   , KnownNat thrd
@@ -601,12 +634,19 @@ machineCycle :: forall k1 k2 n nam mem thrd .
   , (thrd + k2) ~ (2 ^ nam)
   , (2 ^ (nam + 2)) ~ ((2 ^ mem) + n)
   , (4 * 2 ^ nam) ~ (2 ^ (nam + 2))
+
+  , KnownNat scrh
+  , KnownNat scrw
+  , KnownNat col
+  , KnownNat k3
+  , (scrh + scrw + 3 * col + k3) ~ (2 * nam)
   )
   => SNat thrd
-  -> Memory nam mem
+  -> (Memory nam mem, Screen scrh scrw col)
   -> NumFormat nam
-  -> (Memory nam mem, Memory nam mem)
-machineCycle n mem key = 
+  -> ((Memory nam mem, Screen scrh scrw col)
+     ,(Memory nam mem, Screen scrh scrw col))
+machineCycle n (mem, scr) key = 
   let inter :: Vec (2 ^ nam) (Vec 2 (Maybe (Node nam)))
       inter = interactingPorts mem
 
@@ -640,11 +680,19 @@ machineCycle n mem key =
       mem2 :: Memory nam mem
       mem2 = equationExecute mem1
 
-      mem3 :: Memory nam mem
-      mem3 = aluExecute mem2
-  in (mem3, mem3)
+      scr2 = screenExecute scrInstr scr
+  in ((mem2, scr2), (mem2, scr2))
 
-machine :: forall k1 k2 n nam mem thrd dom . 
+
+emptyScreen :: forall scrh scrw col . 
+  ( KnownNat scrh
+  , KnownNat scrw
+  , KnownNat col)
+  => SNat scrh -> SNat scrw -> SNat col
+  -> Screen scrh scrw col
+emptyScreen a b c = repeat (repeat (repeat 0))
+
+machine :: forall k1 k2 k3 n nam mem thrd dom scrh scrw col . 
   ( KnownNat nam
   , KnownNat mem
   , KnownNat thrd
@@ -656,15 +704,22 @@ machine :: forall k1 k2 n nam mem thrd dom .
   , (2 ^ (nam + 2)) ~ ((2 ^ mem) + n)
   , (4 * 2 ^ nam) ~ (2 ^ (nam + 2))
 
+  , KnownNat scrh
+  , KnownNat scrw
+  , KnownNat col
+  , KnownNat k3
+  , (scrh + scrw + 3 * col + k3) ~ (2 * nam)
+
   , KnownDomain dom
   , IP (HiddenClockName dom) (Clock dom)
   , IP (HiddenEnableName dom) (Enable dom)
   , IP (HiddenResetName dom) (Reset dom)
-  ) => SNat thrd
+  ) => SNat thrd -> SNat scrh -> SNat scrw -> SNat col
   -> Memory nam mem
-  -> Signal dom (Memory nam mem)
-machine n m =
-  mealy (machineCycle n) m (pure 0)
+  -> Signal dom (Memory nam mem, Screen scrh scrw col)
+machine n a b c m =
+  mealy (machineCycle n) (m, emptyScreen a b c) (pure 0)
+
 
 
 -- Compiled from `(\x -> x) (\x -> x)`
