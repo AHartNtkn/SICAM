@@ -314,7 +314,7 @@ equInteraction :: KnownNat nam
 equInteraction 
   (k1, p1, (d1, a1 :> _ :> Nil))
   (k2, p2, ans) = 
-  Just (k2, a1, ans) :> repeat Nothing
+  Nothing :> Just (k2, a1, ans) :> Nil
 
 type ScreenInstruction nam = NumFormat nam
 
@@ -705,6 +705,9 @@ emptyScreen :: forall scrh scrw col .
   -> Screen scrh scrw col
 emptyScreen a b c = repeat (repeat (repeat 0))
 
+-- 2^nam should be 3/2 2^mem
+-- thrd should be Ceil((2^nam)/3)
+-- half should be 2^(mem - 1)
 machine :: forall k1 k2 k3 k4 n nam mem thrd half dom scrh scrw col . 
   ( KnownNat nam
   , KnownNat mem
@@ -737,6 +740,47 @@ machine :: forall k1 k2 k3 k4 n nam mem thrd half dom scrh scrw col .
 machine n h a b c m =
   mealy (machineCycle n h) (m, emptyScreen a b c) (pure 0)
 
+machine2 :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 3 2
+  -> Signal dom (Memory 3 2, Screen 1 1 1)
+machine2 = machine (SNat :: SNat 3) (SNat :: SNat 2) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+
+machine4 :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 5 4
+  -> Signal dom (Memory 5 4, Screen 1 1 1)
+machine4 = machine (SNat :: SNat 11) (SNat :: SNat 8) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+
+machine5 :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 6 5
+  -> Signal dom (Memory 6 5, Screen 1 1 1)
+machine5 = machine (SNat :: SNat 22) (SNat :: SNat 16) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+
+
+machine16 :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 17 16
+  -> Signal dom (Memory 17 16, Screen 1 1 1)
+machine16 = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+
 -- Compiled from `(\x -> x) (\x -> x)`
 testMemory1 :: Memory 3 2
 testMemory1 = map Just $
@@ -746,7 +790,7 @@ testMemory1 = map Just $
   (Con, 3, (True, 5 :> 5 :> Nil)) :> -- 3 = \5. 5
   Nil
 
--- sampleN 4 (machine (SNat :: SNat 3) testMemory1 :: Signal System (Memory 3 2))
+-- sampleN 4 (machine2 testMemory1 :: Signal System (Memory 3 2, Screen 1 1 1))
 
 -- Compiled from `(\x -> x) 23`
 testMemory2 :: Memory 3 2
@@ -757,6 +801,9 @@ testMemory2 = map Just $
       (Con, 2, (True, 4 :> 4 :> Nil)) :>    -- 2 = \4. 4
       (Num, 3, (False, l1 :> l2 :> Nil)) :> -- 3 = "23"
       Nil
+
+-- sampleN 4 (machine2 testMemory2 :: Signal System (Memory 3 2, Screen 1 1 1))
+
 
 {- Compiled from `S K K 23`
 
@@ -811,7 +858,7 @@ testMemory3 = (\x -> map Just x ++ repeat Nothing) $
       (Num, 3, (False, l1 :> l2 :> Nil)) :> -- 3 = "23" ; n = 23
       Nil
 
--- sampleN 4 (machine (SNat :: SNat 22) testMemory3 :: Signal System (Memory 6 5))
+-- sampleN 20 (machine5 testMemory3 :: Signal System (Memory 6 5, Screen 1 1 1))
 
 -- Compiled from `K 5 10`
 testMemory6 :: Memory 5 4
