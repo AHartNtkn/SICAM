@@ -210,32 +210,8 @@ packMemory (a, b, c) =
 -- are pointing to eachother.
 interactingPorts :: forall nam mem . (KnownNat nam, KnownNat mem)
   => Memory nam mem
-  -> Vec (2 ^ nam) (Vec 2 (Maybe (Node nam)))
-interactingPorts mem = 
-  let memMap n = maybe (maxBound, Nothing) (\(k, a, b) -> (resize a, Just (k, a, b))) n
-
-      scatter2RacersWithGarbageM :: (KnownNat n, KnownNat m, KnownNat k)
-        => Vec n (Vec 2 (Maybe a))
-        -> Vec m (Index (n + 1))
-        -> Vec (m + k) (Maybe a)
-        -> Vec n (Vec 2 (Maybe a))
-      scatter2RacersWithGarbageM def idxs dat =
-        let rc :: Vec 2 (Maybe a) -> Vec 2 (Maybe a) -> Vec 2 (Maybe a)
-            rc a@(Just k :> Just j :> _) _ = a
-            rc (Just k :> Nothing :> _) (m :> _) = (Just k :> m :> Nil) 
-            rc (Nothing :> _) b = b
-            rc _ _ = undefined
-        in init $ permute rc 
-                          (def ++ ((Nothing :> Nothing :> Nil) :> Nil))
-                          idxs 
-                          (map (:> Nothing :> Nil) dat)
-
-  in uncurry (scatter2RacersWithGarbageM (repeat (repeat Nothing))) $ unzip $ map memMap mem
-
-interactingPorts2 :: forall nam mem . (KnownNat nam, KnownNat mem)
-  => Memory nam mem
   -> Vec (2 ^ nam) (Vec 2 (Maybe (Index (2 ^ mem), Node nam)))
-interactingPorts2 mem = 
+interactingPorts mem = 
   let memMap i n = maybe (maxBound, Nothing) (\(k, a, b) -> (resize a, Just (i, (k, a, b)))) n
 
       scatter2RacersWithGarbageM :: (KnownNat n, KnownNat m, KnownNat k)
@@ -328,7 +304,7 @@ screenInteraction :: KnownNat nam
 screenInteraction 
   (k1, p1, (d1, a1 :> b1 :> Nil))
   (k2, p2, (d2, a2 :> b2 :> Nil)) = 
-  undefined
+  ( repeat Nothing, numUnformat (a2, b2) )
 
 
 aluCheck x y = 
@@ -658,7 +634,7 @@ machineCycle :: forall k1 k2 k3 k4 n nam mem thrd half scrh scrw col .
      ,(Memory nam mem, Screen scrh scrw col))
 machineCycle n1 n2 (mem, scr) key = 
   let inter :: Vec (2 ^ nam) (Vec 2 (Maybe (Index (2 ^ mem), Node nam)))
-      inter = interactingPorts2 mem
+      inter = interactingPorts mem
 
       inter' :: Vec (2 ^ nam) (Vec 2 (Maybe (Node nam)))
       inter' = map (map (fmap snd)) inter
@@ -750,6 +726,17 @@ machine2 :: forall dom .
   -> Signal dom (Memory 3 2, Screen 1 1 1)
 machine2 = machine (SNat :: SNat 3) (SNat :: SNat 2) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
 
+
+machine3 :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 4 3
+  -> Signal dom (Memory 4 3, Screen 1 1 1)
+machine3 = machine (SNat :: SNat 6) (SNat :: SNat 4) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+
 machine4 :: forall dom .
   ( KnownDomain dom
   , IP (HiddenClockName dom) (Clock dom)
@@ -769,17 +756,6 @@ machine5 :: forall dom .
   => Memory 6 5
   -> Signal dom (Memory 6 5, Screen 1 1 1)
 machine5 = machine (SNat :: SNat 22) (SNat :: SNat 16) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
-
-
-machine16 :: forall dom .
-  ( KnownDomain dom
-  , IP (HiddenClockName dom) (Clock dom)
-  , IP (HiddenEnableName dom) (Enable dom)
-  , IP (HiddenResetName dom) (Reset dom)
-  )
-  => Memory 17 16
-  -> Signal dom (Memory 17 16, Screen 1 1 1)
-machine16 = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
 
 -- Compiled from `(\x -> x) (\x -> x)`
 testMemory1 :: Memory 3 2
@@ -901,4 +877,41 @@ testMemory7 = (\x -> map Just x ++ repeat Nothing) $
       (Num, 3, (False, l3 :> l4 :> Nil)) :>         -- 3 = "7"
       Nil
 
--- sampleN 10 (machine (SNat :: SNat 6) testMemory7 :: Signal System (Memory 4 3))
+-- sampleN 10 (machine3 testMemory7 :: Signal System (Memory 4 3, Screen 1 1 1))
+
+
+
+
+
+
+-- (scrh + scrw + 3 * col + k3) ~ (2 * nam)
+
+machine16 :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 17 16
+  -> Signal dom (Memory 17 16, Screen 5 6 7)
+machine16 = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 6) (SNat :: SNat 7)
+
+machine17 :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 18 17
+  -> Signal dom (Memory 18 17, Screen 7 8 7)
+machine17 = machine (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 7) (SNat :: SNat 8) (SNat :: SNat 7)
+
+machine18 :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 19 18
+  -> Signal dom (Memory 19 18, Screen 8 9 7)
+machine18 = machine (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 8) (SNat :: SNat 9) (SNat :: SNat 7)
