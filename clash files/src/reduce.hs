@@ -154,7 +154,7 @@ data Kind
 
   | Num
   | Alu ALUHead Bool
-  | If0 Bool
+  | If0
 
   | Key
   | Scr
@@ -162,9 +162,6 @@ data Kind
 
 isAluKind (Alu _ _) = True
 isAluKind _ = False
-
-isIf0 (If0 _) = True
-isIf0 _ = False
 
 type NumFormat nam = BitVector (2 * nam)
 
@@ -251,7 +248,7 @@ duplicationCheck x y =
   x == Era || 
   (x == Dup && y == Con) ||
   ((x == Dup || x == Con) && (y == Scr || y == Key || y == Num || y == Era || isAluKind y)) ||
-  (x == Dup && isIf0 y)
+  (x == Dup && y == If0)
 
 duplicationInteraction :: (KnownNat nam, KnownNat mem) 
   => Maybe (Vec 2 (Index (2 ^ mem)), Vec 3 (Index (2 ^ nam)))
@@ -312,8 +309,7 @@ screenInteraction
 
 aluCheck x y = 
  (isAluKind x && y == Num) ||
- (x == If0 False && y == Num) ||
- (x == If0 True && y == Con)
+ (x == If0 && y == Num)
 
 aluOp :: KnownNat nam
   => ALUHead
@@ -346,19 +342,10 @@ aluInteraction
                Nothing :>
                Nil
              , resize i )
-    If0 ast -> 
-      case ast of
-        False -> ( Just (If0 True, b1, (d1, a1 :> p1 :> Nil)) :>
-                   Just n2 :>
-                   Nil 
-                 , maxBound )
-        True  -> (\(a, b) -> ( Just (Equ, a1, (True, a :> 0 :> Nil)) :>
-                                Just (Era, b, (False, repeat 0)) :>
-                                Nil
-                              , resize i) ) $
-          case n == 0 of
-            True -> (a2, b2)
-            False -> (b2, a2)
+    If0 -> (\(x, y) -> (Just (Con, b1, (d1, x :> y :> Nil)):>Just (Era, p1, (False, repeat 0)):>Nil,maxBound)) $
+       case numUnformat (a2, b2) == 0 of
+          True  -> (a1, p1)
+          False -> (p1, a1)
     _ -> undefined
 
 keyCheck x = x == Key
