@@ -257,7 +257,7 @@ duplicationInteraction :: (KnownNat nam, KnownNat mem)
   => Maybe (Vec 2 (Index (2 ^ mem)), Vec 3 (Index (2 ^ nam)))
   -> (Index (2 ^ mem), Node nam)
   -> (Index (2 ^ mem), Node nam)
-  -> Vec 4 (Maybe (Index (2 ^ mem), Node nam))
+  -> Vec 4 (Index (2 ^ mem + 1), Maybe (Node nam))
 duplicationInteraction mt
   (i, x@(k1, p1, (d1, a1 :> b1 :> Nil)))
   (j, y@(k2, p2, (d2, a2 :> b2 :> Nil))) = 
@@ -265,21 +265,24 @@ duplicationInteraction mt
     (True, True) -> 
       case mt of
         Just (i2 :> j2 :> Nil, n1 :> n2 :> n3 :> Nil) -> 
-          Just (i,  (k1, a2, (True, n1 :> p1 :> Nil))) :>
-          Just (j,  (k1, b2, (True, n2 :> n3 :> Nil))) :>
-          Just (i2, (k2, a1, (True, n1 :> n2 :> Nil))) :>
-          Just (j2, (k2, b1, (True, p1 :> n3 :> Nil))) :>
+          (resize i,  Just (k1, a2, (True, n1 :> p1 :> Nil))) :>
+          (resize j,  Just (k1, b2, (True, n2 :> n3 :> Nil))) :>
+          (resize i2, Just (k2, a1, (True, n1 :> n2 :> Nil))) :>
+          (resize j2, Just (k2, b1, (True, p1 :> n3 :> Nil))) :>
           Nil
-        Nothing -> Just (i, x) :> Just (j, y) :> repeat Nothing
+        Nothing -> (resize i, Just x) :> (resize j, Just y) :> repeat (maxBound, Nothing)
     (True, False) ->
-      Just (i, (k2, a1, (False, a2 :> b2 :> Nil))) :>
-      Just (j, (k2, b1, (False, a2 :> b2 :> Nil))) :>
-      repeat Nothing
+      (resize i, Just (k2, a1, (False, a2 :> b2 :> Nil))) :>
+      (resize j, Just (k2, b1, (False, a2 :> b2 :> Nil))) :>
+      repeat (maxBound, Nothing)
     (False, True) ->
-      Just (i, (k1, a2, (False, a1 :> b1 :> Nil))) :>
-      Just (j, (k1, b2, (False, a1 :> b1 :> Nil))) :>
-      repeat Nothing
-    (False, False) -> repeat Nothing
+      (resize i, Just (k1, a2, (False, a1 :> b1 :> Nil))) :>
+      (resize j, Just (k1, b2, (False, a1 :> b1 :> Nil))) :>
+      repeat (maxBound, Nothing)
+    (False, False) -> 
+      (resize i, Nothing) :>
+      (resize j, Nothing) :>
+      repeat (maxBound, Nothing)
 
 equCheck x = x == Equ
 
@@ -321,38 +324,38 @@ aluOp h = case h of
   Add -> (+)
   Mul -> (*)
 
-aluInteraction :: KnownNat nam
+aluInteraction :: (KnownNat nam, KnownNat mem)
                => Node nam
                -> Node nam
-               -> NumFormat nam
+               -> (Index (2 ^ mem), NumFormat nam)
                -> ( Vec 2 (Maybe (Node nam))
-                  , Maybe (Index (2 ^ nam)) )
+                  , Index (2 ^ mem + 1) )
 aluInteraction 
-  n1@(k, p1, (d1, a1 :> b1 :> Nil)) n2@(_, _, (_, a2 :> b2 :> _)) n = 
+  n1@(k, p1, (d1, a1 :> b1 :> Nil)) n2@(_, _, (_, a2 :> b2 :> _)) (i, n) = 
   case k of
     Alu h ast ->
       case ast of
         False -> ( Just (Alu h True, b1, (d1, a1 :> p1 :> Nil)) :>
                    Just n2 :>
                    Nil 
-                 , Nothing )
+                 , maxBound )
         True  ->
           let m = numUnformat (a2, b2)
               (l1, l2) = numFormat (aluOp h n m)
           in ( Just (Num, a1, (False, l1 :> l2 :> Nil)) :>
                Nothing :>
                Nil
-             , Just b1 )
+             , resize i )
     If0 ast -> 
       case ast of
         False -> ( Just (If0 True, b1, (d1, a1 :> p1 :> Nil)) :>
                    Just n2 :>
                    Nil 
-                 , Nothing )
+                 , maxBound )
         True  -> (\(a, b) -> ( Just (Equ, a1, (True, a :> 0 :> Nil)) :>
                                 Just (Era, b, (False, repeat 0)) :>
                                 Nil
-                              , Just b1) ) $
+                              , resize i) ) $
           case n == 0 of
             True -> (a2, b2)
             False -> (b2, a2)
@@ -383,11 +386,12 @@ interaction :: forall nam mem . (KnownNat nam, KnownNat mem)
          => NumFormat nam 
          -> Maybe (Vec 2 (Index (2 ^ mem)), Vec 3 (Index (2 ^ nam)))
          -> Vec 2 (Maybe (Index (2 ^ mem), Node nam))
-         -> NumFormat nam
-         -> ( Vec 4 (Maybe (Index (2 ^ mem), Node nam))
-            , Maybe (Index (2 ^ nam))
+         -> (Index (2 ^ mem), NumFormat nam)
+         -> ( Vec 4 (Index (2 ^ mem + 1), Maybe (Node nam))
+            , Index (2 ^ mem + 1)
             , Maybe (ScreenInstruction nam))
-interaction _ _ p@(_ :> Nothing :> Nil) _ = (p ++ repeat Nothing, Nothing, Nothing)
+interaction _ _ p@(_ :> Nothing :> Nil) _ =
+  (map (maybe (maxBound, Nothing) $ bimap resize Just) p ++ repeat (maxBound, Nothing), maxBound, Nothing)
 interaction key mt p@(Just (i, a'@(x', _, _)) :> Just (j, b'@(y', _, _)) :> Nil) n =
   let
     (a, x, b, y) = if interactionSwap x' y'
@@ -395,25 +399,25 @@ interaction key mt p@(Just (i, a'@(x', _, _)) :> Just (j, b'@(y', _, _)) :> Nil)
                     else (a', x', b', y')
   in
   if duplicationCheck x y
-  then (duplicationInteraction mt (i, a) (j, b), Nothing, Nothing)
+  then (duplicationInteraction mt (i, a) (j, b), maxBound, Nothing)
 
-  else (\(x1 :> x2 :> Nil, y, z) -> (fmap (i,) x1 :> fmap (j,) x2 :> repeat Nothing, y, z)) $
+  else (\(x1 :> x2 :> Nil, y, z) -> ((resize i, x1) :> (resize j, x2) :> repeat (maxBound, Nothing), y, z)) $
     if equCheck x
-    then (equInteraction a b, Nothing, Nothing)
+    then (equInteraction a b, maxBound, Nothing)
 
     else if annihilationCheck x y
-    then (annihilationInteraction a b, Nothing, Nothing)
+    then (annihilationInteraction a b, maxBound, Nothing)
 
     else if aluCheck x y
     then (\(x, y) -> (x, y, Nothing)) $ aluInteraction a b n
 
     else if keyCheck x
-    then (keyInteraction key a b, Nothing, Nothing)
+    then (keyInteraction key a b, maxBound, Nothing)
 
     else if screenCheck x y
-    then (\(x, y) -> (x, Nothing, Just y)) $ screenInteraction a b
+    then (\(x, y) -> (x, maxBound, Just y)) $ screenInteraction a b
 
-    else (Just a' :> Just b' :> Nil, Nothing, Nothing)
+    else (Just a' :> Just b' :> Nil, maxBound, Nothing)
 
 
 -- Find all the equations and what they point to.
@@ -618,7 +622,7 @@ machineCycle :: forall k1 k2 k3 k4 n nam mem thrd half scrh scrw col .
   , (thrd + k2) ~ (2 ^ nam)
   , (2 * half) ~ (2 ^ mem)
   , (half + k4) ~ (2 ^ nam)
-  , (2 ^ (nam + 2)) ~ ((2 ^ mem) + n)
+  , (2 ^ (nam + 2)) ~ (2 ^ mem + n)
   , (4 * 2 ^ nam) ~ (2 ^ (nam + 2))
 
   , KnownNat scrh
@@ -642,36 +646,31 @@ machineCycle n1 n2 (mem, scr) key =
       freeStuff :: Vec (2 ^ nam) (Maybe (Vec 2 (Index (2 ^ mem)), Vec 3 (Index (2 ^ nam))))
       freeStuff = scatterFreeStuff n1 n2 mem inter'
 
-      sndPortsM :: Vec 2 (Maybe (Node nam))
-                -> (NumFormat nam, Index (2 ^ nam))
+      sndPortsM :: Vec 2 (Maybe (Index (2 ^ mem), Node nam))
+                -> ((Index (2 ^ mem), NumFormat nam), Index (2 ^ nam))
       sndPortsM (p :> _) = case p of
-        Nothing -> (0, 0)
-        Just (_, _, (_, a :> b :> _)) -> (numUnformat (a, b), b)
+        Nothing -> ((0, 0), 0)
+        Just (i, (_, _, (_, a :> b :> _))) -> ((i, numUnformat (a, b)), b)
 
       -- Gather all the numbers pointed to by a second ancillary port. 
-      secondNums :: Vec (2 ^ nam) (NumFormat nam)
-      secondNums = uncurry gather $ unzip $ map sndPortsM inter'
+      secondNums :: Vec (2 ^ nam) (Index (2 ^ mem), NumFormat nam)
+      secondNums = uncurry gather $ unzip $ map sndPortsM inter
 
-      outMem1 :: Vec (2 ^ nam) (Vec 4 (Maybe (Index (2 ^ mem), Node nam)))
-      usedNums :: Vec (2 ^ nam) (Maybe (Index (2 ^ nam)))
+      outMem1 :: Vec (2 ^ nam) (Vec 4 (Index (2 ^ mem + 1), Maybe (Node nam)))
+      usedNums :: Vec (2 ^ nam) (Index (2 ^ mem + 1))
       scrInstr :: Vec (2 ^ nam) (Maybe (ScreenInstruction nam))
       (outMem1, usedNums, scrInstr) = unzip3 $ zipWith3 (interaction key) freeStuff inter secondNums
 
-      -- Scatter number changes from ALU
-      outMem2 :: Vec (4 * 2 ^ nam) (Maybe (Index (2 ^ mem), Node nam))
-      outMem2 = concat $ scatterWithGarbage 
-                            outMem1
-                            (map (maybe maxBound resize) usedNums)
-                            (repeat @(2^nam) (repeat @4 Nothing))
+      -- Scatter changes from interaction
+      outMem2 :: Memory nam mem
+      outMem2 = uncurry (scatterWithGarbage mem) (unzip $ concat outMem1)
 
-      outMem3 :: Vec (4 * 2 ^ nam) (Index (2 ^ mem + 1), Maybe (Node nam))
-      outMem3 = map (maybe (maxBound, Nothing) (bimap resize Just)) outMem2
-
-      mem2 :: Memory nam mem
-      mem2 = uncurry (scatterWithGarbage (repeat Nothing)) $ unzip outMem3
+      -- Scatter changes from ALU
+      outMem3 :: Memory nam mem
+      outMem3 = scatterWithGarbage outMem2 usedNums (repeat @(2^nam) Nothing)
 
       scr2 = screenExecute scrInstr scr
-  in ((mem2, scr2), (mem2, scr2))
+  in ((outMem3, scr2), (outMem3, scr2))
 
 emptyScreen :: forall scrh scrw col . 
   ( KnownNat scrh
@@ -896,6 +895,16 @@ machine16 :: forall dom .
   -> Signal dom (Memory 17 16, Screen 5 6 7)
 machine16 = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 6) (SNat :: SNat 7)
 
+machine16S :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 17 16
+  -> Signal dom (Memory 17 16, Screen 5 5 8)
+machine16S = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 5) (SNat :: SNat 8)
+
 machine17 :: forall dom .
   ( KnownDomain dom
   , IP (HiddenClockName dom) (Clock dom)
@@ -906,6 +915,17 @@ machine17 :: forall dom .
   -> Signal dom (Memory 18 17, Screen 7 8 7)
 machine17 = machine (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 7) (SNat :: SNat 8) (SNat :: SNat 7)
 
+machine17S :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 18 17
+  -> Signal dom (Memory 18 17, Screen 6 6 8)
+machine17S = machine (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 6) (SNat :: SNat 6) (SNat :: SNat 8)
+
+
 machine18 :: forall dom .
   ( KnownDomain dom
   , IP (HiddenClockName dom) (Clock dom)
@@ -915,3 +935,13 @@ machine18 :: forall dom .
   => Memory 19 18
   -> Signal dom (Memory 19 18, Screen 8 9 7)
 machine18 = machine (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 8) (SNat :: SNat 9) (SNat :: SNat 7)
+
+machine18S :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 19 18
+  -> Signal dom (Memory 19 18, Screen 7 7 8)
+machine18S = machine (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 7) (SNat :: SNat 7) (SNat :: SNat 8)
