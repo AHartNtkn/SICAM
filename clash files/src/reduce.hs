@@ -177,32 +177,6 @@ type Node nam = (Kind, Index (2 ^ nam), (Bool, Vec 2 (Index (2 ^ nam))))
 type Memory nam mem = Vec (2 ^ mem) (Maybe (Node nam))
 type Screen scrh scrw col = Vec (2 ^ scrh) (Vec (2 ^ scrw) (Vec 3 (BitVector col)))
 
-unpackMemory :: forall nam mem . (KnownNat nam, KnownNat mem)
-  => Memory nam mem
-  -> ( Vec (2 ^ mem) (Maybe Kind)
-     , Vec (2 ^ mem) (Maybe (Index (2 ^ nam)))
-     , Vec (2 ^ mem) (Maybe (Bool, Vec 2 (Index (2 ^ nam)))) )
-unpackMemory mem = 
-  let mem' :: Vec (2 ^ mem) (Maybe Kind, Maybe (Index (2 ^ nam)), Maybe (Bool, Vec 2 (Index (2 ^ nam))))
-      mem' = map (maybe (Nothing, Nothing, Nothing) (\(a, b, c) -> (Just a, Just b, Just c))) mem
-  in unzip3 mem'
-
-packMemory :: forall nam mem . (KnownNat nam, KnownNat mem)
-  => ( Vec (2 ^ mem) (Maybe Kind)
-     , Vec (2 ^ mem) (Maybe (Index (2 ^ nam)))
-     , Vec (2 ^ mem) (Maybe (Bool, Vec 2 (Index (2 ^ nam)))) )
-  -> Memory nam mem
-packMemory (a, b, c) =
-  let mem :: Vec (2 ^ mem) (Maybe Kind, Maybe (Index (2 ^ nam)), Maybe (Bool, Vec 2 (Index (2 ^ nam))))
-      mem = zip3 a b c
-
-      memProc :: (Maybe Kind, Maybe (Index (2 ^ nam)), Maybe (Bool, Vec 2 (Index (2 ^ nam))))
-              -> Maybe (Kind, Index (2 ^ nam), (Bool, Vec 2 (Index (2 ^ nam))))
-      memProc (Nothing, Nothing, Nothing) = Nothing
-      memProc (Just a, Just b, Just c) = Just (a, b, c)
-      memProc _ = undefined
-  in map memProc mem
-
 -- Permute memory so that all principal ports
 -- are pointing to eachother.
 interactingPorts :: forall nam mem . (KnownNat nam, KnownNat mem)
