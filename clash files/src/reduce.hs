@@ -365,26 +365,27 @@ interaction key mt p@(Just (i, a'@(x', _, _)) :> Just (j, b'@(y', _, _)) :> Nil)
         then (b', y', a', x')
         else (a', x', b', y')
   in
-  if duplicationCheck x y
-  then (duplicationInteraction mt (i, a) (j, b), Nothing)
+  if screenCheck x y
+  then (\(x1 :> x2 :> Nil, y) -> ((resize i, x1) :> (resize j, x2) :> repeat (maxBound, Nothing), Just y)) $ screenInteraction a b
 
-  else if aluCheck x y
-  then (aluInteraction i a j b n ++ repeat (maxBound, Nothing), Nothing)
+  else (,Nothing) $
+    if duplicationCheck x y
+    then duplicationInteraction mt (i, a) (j, b)
 
-  else (\(x1 :> x2 :> Nil, z) -> ((resize i, x1) :> (resize j, x2) :> repeat (maxBound, Nothing), z)) $
-    if equCheck x
-    then (equInteraction a b, Nothing)
+    else if aluCheck x y
+    then aluInteraction i a j b n ++ repeat (maxBound, Nothing)
 
-    else if annihilationCheck x y
-    then (annihilationInteraction a b, Nothing)
+    else (\(x1 :> x2 :> Nil) -> (resize i, x1) :> (resize j, x2) :> repeat (maxBound, Nothing)) $
+      if equCheck x
+      then equInteraction a b
 
-    else if keyCheck x
-    then (keyInteraction key a b, Nothing)
+      else if annihilationCheck x y
+      then annihilationInteraction a b
 
-    else if screenCheck x y
-    then (\(x, y) -> (x, Just y)) $ screenInteraction a b
+      else if keyCheck x
+      then keyInteraction key a b
 
-    else (Just a' :> Just b' :> Nil, Nothing)
+      else (Just a' :> Just b' :> Nil)
 
 
 -- Find all the equations and what they point to.
