@@ -360,11 +360,10 @@ interaction :: forall nam mem . (KnownNat nam, KnownNat mem)
             , Maybe (ScreenInstruction nam) )
 interaction _ _ p@(_ :> Nothing :> Nil) _ = (repeat (maxBound, Nothing), Nothing)
 interaction key mt p@(Just (i, a'@(x', _, _)) :> Just (j, b'@(y', _, _)) :> Nil) n =
-
-  let
-    (a, x, b, y) = if interactionSwap x' y'
-                    then (b', y', a', x')
-                    else (a', x', b', y')
+  let (a, x, b, y) = 
+        if interactionSwap x' y'
+        then (b', y', a', x')
+        else (a', x', b', y')
   in
   if duplicationCheck x y
   then (duplicationInteraction mt (i, a) (j, b), Nothing)
