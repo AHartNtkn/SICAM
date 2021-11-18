@@ -925,7 +925,7 @@ testMemory7 :: Memory 4 3
 testMemory7 = (\x -> map Just x ++ repeat Nothing) $
   let (l1, l2) = numFormat 5
       (l3, l4) = numFormat 7
-  in  (Rot, 1, (True, 0 :> 0 :> Nil)) :>    -- 1 = Root
+  in  (Rot, 1, (False, 0 :> 0 :> Nil)) :>    -- 1 = Root
 
       (Alu Add False, 3, (True, 1 :> 2 :> Nil)) :>  -- 1 = 2 + 3 
       (Num, 2, (False, l1 :> l2 :> Nil)) :>         -- 2 = "5"
