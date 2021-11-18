@@ -676,6 +676,39 @@ machine :: forall k1 k2 k3 k4 n nam mem thrd half dom scrh scrw col .
 machine n h a b c m =
   mealy (machineCycle n h) (m, emptyScreen a b c) (pure 0)
 
+machineI :: forall k1 k2 k3 k4 n nam mem thrd half dom scrh scrw col . 
+  ( KnownNat nam
+  , KnownNat mem
+  , KnownNat thrd
+  , KnownNat half
+  , KnownNat k1
+  , KnownNat k2
+  , KnownNat k4
+  , KnownNat n
+  , (3 * thrd) ~ (2 ^ nam + k1)
+  , (thrd + k2) ~ (2 ^ nam)
+  , (2 * half) ~ (2 ^ mem)
+  , (half + k4) ~ (2 ^ nam)
+  , (2 ^ (nam + 2)) ~ ((2 ^ mem) + n)
+  , (4 * 2 ^ nam) ~ (2 ^ (nam + 2))
+
+  , KnownNat scrh
+  , KnownNat scrw
+  , KnownNat col
+  , KnownNat k3
+  , (scrh + scrw + 3 * col + k3) ~ (2 * nam)
+
+  , KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  ) => SNat thrd -> SNat half -> SNat scrh -> SNat scrw -> SNat col
+  -> Memory nam mem
+  -> Signal dom (NumFormat nam)
+  -> Signal dom (Screen scrh scrw col)
+machineI n h a b c m =
+  mealy (machineCycle n h) (m, emptyScreen a b c)
+
 machine2 :: forall dom .
   ( KnownDomain dom
   , IP (HiddenClockName dom) (Clock dom)
@@ -697,6 +730,7 @@ machine3 :: forall dom .
   -> Signal dom (Screen 1 1 1)
 machine3 = machine (SNat :: SNat 6) (SNat :: SNat 4) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
 
+{-
 machine4 :: forall dom .
   ( KnownDomain dom
   , IP (HiddenClockName dom) (Clock dom)
@@ -706,6 +740,7 @@ machine4 :: forall dom .
   => Memory 5 4
   -> Signal dom (Screen 1 1 1)
 machine4 = machine (SNat :: SNat 11) (SNat :: SNat 8) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+-}
 
 machine5 :: forall dom .
   ( KnownDomain dom
@@ -846,6 +881,69 @@ testMemory7 = (\x -> map Just x ++ repeat Nothing) $
 
 -- (scrh + scrw + 3 * col + k3) ~ (2 * nam)
 
+{-
+machineN :: forall n dom .
+  ( KnownNat n
+  , KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory (n+12) (n+11)
+  -> Signal dom (NumFormat (n+12))
+  -> Signal dom (Screen n (n+1) 7)
+machineN = 
+  machineI (SNat :: SNat (2^(n+12)))
+           (SNat :: SNat (2^(n+10))) 
+           (SNat :: SNat n)
+           (SNat :: SNat (n+1))
+           (SNat :: SNat 7)
+-}
+
+machine4 :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 5 4
+  -> Signal dom (NumFormat 5)
+  -> Signal dom (Screen 1 1 1)
+machine4 = machineI (SNat :: SNat 11) (SNat :: SNat 8) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+
+machine4S :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 5 4
+  -> Signal dom (NumFormat 5)
+  -> Signal dom (Screen 1 1 1)
+machine4S = machineI (SNat :: SNat 11) (SNat :: SNat 8) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+
+machine15 :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 16 15
+  -> Signal dom (NumFormat 16)
+  -> Signal dom (Screen 4 5 7)
+machine15 = machineI (SNat :: SNat 21846) (SNat :: SNat 16384) (SNat :: SNat 4) (SNat :: SNat 5) (SNat :: SNat 7)
+
+machine15S :: forall dom .
+  ( KnownDomain dom
+  , IP (HiddenClockName dom) (Clock dom)
+  , IP (HiddenEnableName dom) (Enable dom)
+  , IP (HiddenResetName dom) (Reset dom)
+  )
+  => Memory 16 15
+  -> Signal dom (NumFormat 16)
+  -> Signal dom (Screen 4 4 8)
+machine15S = machineI (SNat :: SNat 21846) (SNat :: SNat 16384) (SNat :: SNat 4) (SNat :: SNat 4) (SNat :: SNat 8)
+
 machine16 :: forall dom .
   ( KnownDomain dom
   , IP (HiddenClockName dom) (Clock dom)
@@ -853,8 +951,9 @@ machine16 :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 17 16
+  -> Signal dom (NumFormat 17)
   -> Signal dom (Screen 5 6 7)
-machine16 = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 6) (SNat :: SNat 7)
+machine16 = machineI (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 6) (SNat :: SNat 7)
 
 machine16S :: forall dom .
   ( KnownDomain dom
@@ -863,8 +962,9 @@ machine16S :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 17 16
+  -> Signal dom (NumFormat 17)
   -> Signal dom (Screen 5 5 8)
-machine16S = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 5) (SNat :: SNat 8)
+machine16S = machineI (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 5) (SNat :: SNat 8)
 
 machine17 :: forall dom .
   ( KnownDomain dom
@@ -873,8 +973,9 @@ machine17 :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 18 17
+  -> Signal dom (NumFormat 18)
   -> Signal dom (Screen 7 8 7)
-machine17 = machine (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 7) (SNat :: SNat 8) (SNat :: SNat 7)
+machine17 = machineI (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 7) (SNat :: SNat 8) (SNat :: SNat 7)
 
 machine17S :: forall dom .
   ( KnownDomain dom
@@ -883,8 +984,9 @@ machine17S :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 18 17
+  -> Signal dom (NumFormat 18)
   -> Signal dom (Screen 6 6 8)
-machine17S = machine (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 6) (SNat :: SNat 6) (SNat :: SNat 8)
+machine17S = machineI (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 6) (SNat :: SNat 6) (SNat :: SNat 8)
 
 
 machine18 :: forall dom .
@@ -894,8 +996,9 @@ machine18 :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 19 18
+  -> Signal dom (NumFormat 19)
   -> Signal dom (Screen 8 9 7)
-machine18 = machine (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 8) (SNat :: SNat 9) (SNat :: SNat 7)
+machine18 = machineI (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 8) (SNat :: SNat 9) (SNat :: SNat 7)
 
 machine18S :: forall dom .
   ( KnownDomain dom
@@ -904,6 +1007,32 @@ machine18S :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 19 18
+  -> Signal dom (NumFormat 19)
   -> Signal dom (Screen 7 7 8)
-machine18S = machine (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 7) (SNat :: SNat 7) (SNat :: SNat 8)
+machine18S = machineI (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 7) (SNat :: SNat 7) (SNat :: SNat 8)
 
+topEntity16
+  :: Clock System
+  -> Reset System
+  -> Enable System
+  -> Memory 17 16
+  -> Signal System (NumFormat 17)
+  -> Signal System (Screen 5 5 8)
+topEntity16 = exposeClockResetEnable machine16S
+
+topEntity 
+  :: Clock System
+  -> Reset System
+  -> Enable System
+  -> Memory 5 4
+  -> Signal System (NumFormat 5)
+  -> Signal System (Screen 1 1 1)
+topEntity = exposeClockResetEnable machine4S
+
+{-
+
+exposeClockResetEnable
+  :: KnownDomain dom =>
+     (HiddenClockResetEnable dom => r)
+     -> Clock dom -> Reset dom -> Enable dom -> r
+-}
