@@ -940,26 +940,6 @@ testMemory7 = (\x -> map Just x ++ repeat Nothing) $
 
 
 -- (scrh + scrw + 3 * col + k3) ~ (2 * nam)
-
-{-
-machineN :: forall n dom .
-  ( KnownNat n
-  , KnownDomain dom
-  , IP (HiddenClockName dom) (Clock dom)
-  , IP (HiddenEnableName dom) (Enable dom)
-  , IP (HiddenResetName dom) (Reset dom)
-  )
-  => Memory (n+12) (n+11)
-  -> Signal dom (NumFormat (n+12))
-  -> Signal dom (Screen n (n+1) 7)
-machineN = 
-  machine (SNat :: SNat (2^(n+12)))
-           (SNat :: SNat (2^(n+10))) 
-           (SNat :: SNat n)
-           (SNat :: SNat (n+1))
-           (SNat :: SNat 7)
--}
-
 machine4 :: forall dom .
   ( KnownDomain dom
   , IP (HiddenClockName dom) (Clock dom)
@@ -1089,10 +1069,3 @@ topEntity
   -> Signal System (Screen 1 1 1)
 topEntity = exposeClockResetEnable testMachine4S
 
-{-
-
-exposeClockResetEnable
-  :: KnownDomain dom =>
-     (HiddenClockResetEnable dom => r)
-     -> Clock dom -> Reset dom -> Enable dom -> r
--}
