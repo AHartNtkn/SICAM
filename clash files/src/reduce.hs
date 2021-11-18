@@ -295,32 +295,39 @@ aluOp h = case h of
   Mul -> (*)
 
 aluInteraction :: (KnownNat nam, KnownNat mem)
-               => Node nam
+               => Index (2 ^ mem)
+               -> Node nam
+               -> Index (2 ^ mem)
                -> Node nam
                -> (Index (2 ^ mem), NumFormat nam)
-               -> ( Vec 2 (Maybe (Node nam))
-                  , Index (2 ^ mem + 1) )
+               -> (Vec 3 (Index (2 ^ mem + 1), Maybe (Node nam)))
 aluInteraction 
-  n1@(k, p1, (d1, a1 :> b1 :> Nil)) n2@(_, _, (_, a2 :> b2 :> _)) (i, n) = 
-  case k of
-    Alu h ast ->
-      case ast of
-        False -> ( Just (Alu h True, b1, (d1, a1 :> p1 :> Nil)) :>
-                   Just n2 :>
-                   Nil 
-                 , maxBound )
-        True  ->
-          let m = numUnformat (a2, b2)
-              (l1, l2) = numFormat (aluOp h n m)
-          in ( Just (Num, a1, (False, l1 :> l2 :> Nil)) :>
-               Nothing :>
-               Nil
-             , resize i )
-    If0 -> (\(x, y) -> (Just (Con, b1, (d1, x :> y :> Nil)):>Just (Era, p1, (False, repeat 0)):>Nil,maxBound)) $
-       case numUnformat (a2, b2) == 0 of
-          True  -> (a1, p1)
-          False -> (p1, a1)
-    _ -> undefined
+  i1 n1@(k, p1, (d1, a1 :> b1 :> Nil)) 
+  i2 n2@(_, _, (_, a2 :> b2 :> _))
+  (i, n) = 
+  let (a, b, c) =
+        case k of
+          Alu h ast ->
+            case ast of
+              False -> ( (Alu h True, b1, (d1, a1 :> p1 :> Nil))
+                       , Just n2
+                       , maxBound )
+              True  ->
+                let m = numUnformat (a2, b2)
+                    (l1, l2) = numFormat (aluOp h n m)
+                in ( (Num, a1, (False, l1 :> l2 :> Nil))
+                   , Nothing
+                   , resize i )
+          If0 -> (\(x, y) -> ( (Con, b1, (d1, x :> y :> Nil))
+                              , Just (Era, p1, (False, repeat 0))
+                              , maxBound )) $
+             case numUnformat (a2, b2) == 0 of
+                True  -> (a1, p1)
+                False -> (p1, a1)
+          _ -> undefined
+  in (resize i1, Just a):>
+     (resize i2, b):>
+     (c, Nothing):>Nil
 
 keyCheck x = x == Key
 
@@ -343,42 +350,43 @@ interactionSwap k1 k2 =
   ((isAluKind k1 || k1 == Scr) && (k2 == Key)) ||
   (k1 == Num && isAluKind k2)
 
+
 interaction :: forall nam mem . (KnownNat nam, KnownNat mem)
          => NumFormat nam 
          -> Maybe (Vec 2 (Index (2 ^ mem)), Vec 3 (Index (2 ^ nam)))
          -> Vec 2 (Maybe (Index (2 ^ mem), Node nam))
          -> (Index (2 ^ mem), NumFormat nam)
          -> ( Vec 4 (Index (2 ^ mem + 1), Maybe (Node nam))
-            , Index (2 ^ mem + 1)
-            , Maybe (ScreenInstruction nam))
+            , Maybe (ScreenInstruction nam) )
 interaction _ _ p@(_ :> Nothing :> Nil) _ =
-  (map (maybe (maxBound, Nothing) $ bimap resize Just) p ++ repeat (maxBound, Nothing), maxBound, Nothing)
+  (map (maybe (maxBound, Nothing) $ bimap resize Just) p ++ repeat (maxBound, Nothing), Nothing)
 interaction key mt p@(Just (i, a'@(x', _, _)) :> Just (j, b'@(y', _, _)) :> Nil) n =
+
   let
     (a, x, b, y) = if interactionSwap x' y'
                     then (b', y', a', x')
                     else (a', x', b', y')
   in
   if duplicationCheck x y
-  then (duplicationInteraction mt (i, a) (j, b), maxBound, Nothing)
+  then (duplicationInteraction mt (i, a) (j, b), Nothing)
 
-  else (\(x1 :> x2 :> Nil, y, z) -> ((resize i, x1) :> (resize j, x2) :> repeat (maxBound, Nothing), y, z)) $
+  else if aluCheck x y
+  then (aluInteraction i a j b n ++ repeat (maxBound, Nothing), Nothing)
+
+  else (\(x1 :> x2 :> Nil, z) -> ((resize i, x1) :> (resize j, x2) :> repeat (maxBound, Nothing), z)) $
     if equCheck x
-    then (equInteraction a b, maxBound, Nothing)
+    then (equInteraction a b, Nothing)
 
     else if annihilationCheck x y
-    then (annihilationInteraction a b, maxBound, Nothing)
-
-    else if aluCheck x y
-    then (\(x, y) -> (x, y, Nothing)) $ aluInteraction a b n
+    then (annihilationInteraction a b, Nothing)
 
     else if keyCheck x
-    then (keyInteraction key a b, maxBound, Nothing)
+    then (keyInteraction key a b, Nothing)
 
     else if screenCheck x y
-    then (\(x, y) -> (x, maxBound, Just y)) $ screenInteraction a b
+    then (\(x, y) -> (x, Just y)) $ screenInteraction a b
 
-    else (Just a' :> Just b' :> Nil, maxBound, Nothing)
+    else (Just a' :> Just b' :> Nil, Nothing)
 
 
 -- Find all the equations and what they point to.
@@ -618,20 +626,15 @@ machineCycle n1 n2 (mem, scr) key =
       secondNums = uncurry gather $ unzip $ map sndPortsM inter
 
       outMem1 :: Vec (2 ^ nam) (Vec 4 (Index (2 ^ mem + 1), Maybe (Node nam)))
-      usedNums :: Vec (2 ^ nam) (Index (2 ^ mem + 1))
       scrInstr :: Vec (2 ^ nam) (Maybe (ScreenInstruction nam))
-      (outMem1, usedNums, scrInstr) = unzip3 $ zipWith3 (interaction key) freeStuff inter secondNums
+      (outMem1, scrInstr) = unzip $ zipWith3 (interaction key) freeStuff inter secondNums
 
       -- Scatter changes from interaction
       outMem2 :: Memory nam mem
       outMem2 = uncurry (scatterWithGarbage mem) (unzip $ concat outMem1)
 
-      -- Scatter changes from ALU
-      outMem3 :: Memory nam mem
-      outMem3 = scatterWithGarbage outMem2 usedNums (repeat @(2^nam) Nothing)
-
       scr2 = screenExecute scrInstr scr
-  in ((outMem3, scr2), scr2)
+  in ((outMem2, scr2), scr2)
 
 emptyScreen :: forall scrh scrw col . 
   ( KnownNat scrh
