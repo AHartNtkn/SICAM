@@ -596,7 +596,7 @@ machineCycle :: forall k1 k2 k3 k4 n nam mem thrd half scrh scrw col .
   -> (Memory nam mem, Screen scrh scrw col)
   -> NumFormat nam
   -> ((Memory nam mem, Screen scrh scrw col)
-     ,(Memory nam mem, Screen scrh scrw col))
+     , Screen scrh scrw col )
 machineCycle n1 n2 (mem, scr) key = 
   let inter :: Vec (2 ^ nam) (Vec 2 (Maybe (Index (2 ^ mem), Node nam)))
       inter = interactingPorts mem
@@ -631,7 +631,7 @@ machineCycle n1 n2 (mem, scr) key =
       outMem3 = scatterWithGarbage outMem2 usedNums (repeat @(2^nam) Nothing)
 
       scr2 = screenExecute scrInstr scr
-  in ((outMem3, scr2), (outMem3, scr2))
+  in ((outMem3, scr2), scr2)
 
 emptyScreen :: forall scrh scrw col . 
   ( KnownNat scrh
@@ -672,7 +672,7 @@ machine :: forall k1 k2 k3 k4 n nam mem thrd half dom scrh scrw col .
   , IP (HiddenResetName dom) (Reset dom)
   ) => SNat thrd -> SNat half -> SNat scrh -> SNat scrw -> SNat col
   -> Memory nam mem
-  -> Signal dom (Memory nam mem, Screen scrh scrw col)
+  -> Signal dom (Screen scrh scrw col)
 machine n h a b c m =
   mealy (machineCycle n h) (m, emptyScreen a b c) (pure 0)
 
@@ -683,7 +683,7 @@ machine2 :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 3 2
-  -> Signal dom (Memory 3 2, Screen 1 1 1)
+  -> Signal dom (Screen 1 1 1)
 machine2 = machine (SNat :: SNat 3) (SNat :: SNat 2) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
 
 
@@ -694,7 +694,7 @@ machine3 :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 4 3
-  -> Signal dom (Memory 4 3, Screen 1 1 1)
+  -> Signal dom (Screen 1 1 1)
 machine3 = machine (SNat :: SNat 6) (SNat :: SNat 4) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
 
 machine4 :: forall dom .
@@ -704,7 +704,7 @@ machine4 :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 5 4
-  -> Signal dom (Memory 5 4, Screen 1 1 1)
+  -> Signal dom (Screen 1 1 1)
 machine4 = machine (SNat :: SNat 11) (SNat :: SNat 8) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
 
 machine5 :: forall dom .
@@ -714,7 +714,7 @@ machine5 :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 6 5
-  -> Signal dom (Memory 6 5, Screen 1 1 1)
+  -> Signal dom (Screen 1 1 1)
 machine5 = machine (SNat :: SNat 22) (SNat :: SNat 16) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
 
 -- Compiled from `(\x -> x) (\x -> x)`
@@ -853,7 +853,7 @@ machine16 :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 17 16
-  -> Signal dom (Memory 17 16, Screen 5 6 7)
+  -> Signal dom (Screen 5 6 7)
 machine16 = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 6) (SNat :: SNat 7)
 
 machine16S :: forall dom .
@@ -863,7 +863,7 @@ machine16S :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 17 16
-  -> Signal dom (Memory 17 16, Screen 5 5 8)
+  -> Signal dom (Screen 5 5 8)
 machine16S = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 5) (SNat :: SNat 8)
 
 machine17 :: forall dom .
@@ -873,7 +873,7 @@ machine17 :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 18 17
-  -> Signal dom (Memory 18 17, Screen 7 8 7)
+  -> Signal dom (Screen 7 8 7)
 machine17 = machine (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 7) (SNat :: SNat 8) (SNat :: SNat 7)
 
 machine17S :: forall dom .
@@ -883,7 +883,7 @@ machine17S :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 18 17
-  -> Signal dom (Memory 18 17, Screen 6 6 8)
+  -> Signal dom (Screen 6 6 8)
 machine17S = machine (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 6) (SNat :: SNat 6) (SNat :: SNat 8)
 
 
@@ -894,7 +894,7 @@ machine18 :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 19 18
-  -> Signal dom (Memory 19 18, Screen 8 9 7)
+  -> Signal dom (Screen 8 9 7)
 machine18 = machine (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 8) (SNat :: SNat 9) (SNat :: SNat 7)
 
 machine18S :: forall dom .
@@ -904,5 +904,6 @@ machine18S :: forall dom .
   , IP (HiddenResetName dom) (Reset dom)
   )
   => Memory 19 18
-  -> Signal dom (Memory 19 18, Screen 7 7 8)
+  -> Signal dom (Screen 7 7 8)
 machine18S = machine (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 7) (SNat :: SNat 7) (SNat :: SNat 8)
+
