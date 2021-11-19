@@ -1,17 +1,13 @@
 {-# LANGUAGE TupleSections, DataKinds, GADTs, KindSignatures #-}
-{-# LANGUAGE Rank2Types, ScopedTypeVariables  #-}
 {-# LANGUAGE TypeFamilies, TypeOperators, UndecidableInstances #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns -fno-warn-redundant-constraints #-}
 
-{-# LANGUAGE NoImplicitPrelude #-}
-
 -- stack exec --package clash-ghc -- clashi
 
 module Reduce where
 
-import Data.Int
 import Data.Proxy
 import Data.Maybe
 import Data.Bifunctor
@@ -24,9 +20,7 @@ import Clash.Prelude
 import Clash.Signal
 import Clash.Sized.Internal.Index
 import Clash.Sized.BitVector
-import Clash.Sized.Unsigned
 import GHC.Classes
-
 
 import GHC.TypeLits
 
@@ -386,6 +380,7 @@ interaction key mt p@(Just (i, a'@(x', _, _)) :> Just (j, b'@(y', _, _)) :> Nil)
       then keyInteraction key a b
 
       else (Just a' :> Just b' :> Nil)
+interaction _ _ _ _ = undefined
 
 
 -- Find all the equations and what they point to.
@@ -700,9 +695,8 @@ emptyScreen :: forall scrh scrw col .
   ( KnownNat scrh
   , KnownNat scrw
   , KnownNat col)
-  => SNat scrh -> SNat scrw -> SNat col
-  -> Screen scrh scrw col
-emptyScreen a b c = repeat (repeat (repeat 0))
+  => Screen scrh scrw col
+emptyScreen = repeat (repeat (repeat 0))
 
 testMachine :: forall k1 k2 k3 k4 n nam mem thrd half dom scrh scrw col . 
   ( KnownNat nam
@@ -730,11 +724,11 @@ testMachine :: forall k1 k2 k3 k4 n nam mem thrd half dom scrh scrw col .
   , IP (HiddenClockName dom) (Clock dom)
   , IP (HiddenEnableName dom) (Enable dom)
   , IP (HiddenResetName dom) (Reset dom)
-  ) => SNat thrd -> SNat half -> SNat scrh -> SNat scrw -> SNat col
+  ) => SNat thrd -> SNat half
   -> Memory nam mem
   -> Signal dom (Memory nam mem, Screen scrh scrw col)
-testMachine n h a b c m =
-  mealy (testMachineCycle n h) (m, emptyScreen a b c) (pure 0)
+testMachine n h m =
+  mealy (testMachineCycle n h) (m, emptyScreen @scrh @scrw @col) (pure 0)
 
 -- 2^nam should be 3/2 2^mem
 -- thrd should be Ceil((2^nam)/3)
@@ -765,12 +759,12 @@ machine :: forall k1 k2 k3 k4 n nam mem thrd half dom scrh scrw col .
   , IP (HiddenClockName dom) (Clock dom)
   , IP (HiddenEnableName dom) (Enable dom)
   , IP (HiddenResetName dom) (Reset dom)
-  ) => SNat thrd -> SNat half -> SNat scrh -> SNat scrw -> SNat col
+  ) => SNat thrd -> SNat half
   -> Memory nam mem
   -> Signal dom (NumFormat nam)
   -> Signal dom (Screen scrh scrw col)
-machine n h a b c m =
-  mealy (machineCycle n h) (m, emptyScreen a b c)
+machine n h m =
+  mealy (machineCycle n h) (m, emptyScreen @scrh @scrw @col)
 
 testMachine2 :: forall dom .
   ( KnownDomain dom
@@ -780,7 +774,7 @@ testMachine2 :: forall dom .
   )
   => Memory 3 2
   -> Signal dom (Memory 3 2, Screen 1 1 1)
-testMachine2 = testMachine (SNat :: SNat 3) (SNat :: SNat 2) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+testMachine2 = testMachine (SNat :: SNat 3) (SNat :: SNat 2)
 
 testMachine3 :: forall dom .
   ( KnownDomain dom
@@ -790,7 +784,7 @@ testMachine3 :: forall dom .
   )
   => Memory 4 3
   -> Signal dom ( Memory 4 3, Screen 1 1 1)
-testMachine3 = testMachine (SNat :: SNat 6) (SNat :: SNat 4) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+testMachine3 = testMachine (SNat :: SNat 6) (SNat :: SNat 4)
 
 testMachine4 :: forall dom .
   ( KnownDomain dom
@@ -800,7 +794,7 @@ testMachine4 :: forall dom .
   )
   => Memory 5 4
   -> Signal dom (Memory 5 4, Screen 1 1 1)
-testMachine4 = testMachine (SNat :: SNat 11) (SNat :: SNat 8) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+testMachine4 = testMachine (SNat :: SNat 11) (SNat :: SNat 8)
 
 testMachine5 :: forall dom .
   ( KnownDomain dom
@@ -810,7 +804,7 @@ testMachine5 :: forall dom .
   )
   => Memory 6 5
   -> Signal dom (Memory 6 5, Screen 1 1 1)
-testMachine5 = testMachine (SNat :: SNat 22) (SNat :: SNat 16) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+testMachine5 = testMachine (SNat :: SNat 22) (SNat :: SNat 16)
 
 -- Compiled from `(\x -> x) (\x -> x)`
 testMemory1 :: Memory 3 2
@@ -949,9 +943,9 @@ machine4 :: forall dom .
   => Memory 5 4
   -> Signal dom (NumFormat 5)
   -> Signal dom (Screen 1 1 1)
-machine4 = machine (SNat :: SNat 11) (SNat :: SNat 8) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+machine4 = machine (SNat :: SNat 11) (SNat :: SNat 8)
 
-testMachine4S :: forall dom .
+machine4S :: forall dom .
   ( KnownDomain dom
   , IP (HiddenClockName dom) (Clock dom)
   , IP (HiddenEnableName dom) (Enable dom)
@@ -960,7 +954,7 @@ testMachine4S :: forall dom .
   => Memory 5 4
   -> Signal dom (NumFormat 5)
   -> Signal dom (Screen 1 1 1)
-testMachine4S = machine (SNat :: SNat 11) (SNat :: SNat 8) (SNat :: SNat 1) (SNat :: SNat 1) (SNat :: SNat 1)
+machine4S = machine (SNat :: SNat 11) (SNat :: SNat 8)
 
 machine15 :: forall dom .
   ( KnownDomain dom
@@ -971,7 +965,7 @@ machine15 :: forall dom .
   => Memory 16 15
   -> Signal dom (NumFormat 16)
   -> Signal dom (Screen 4 5 7)
-machine15 = machine (SNat :: SNat 21846) (SNat :: SNat 16384) (SNat :: SNat 4) (SNat :: SNat 5) (SNat :: SNat 7)
+machine15 = machine (SNat :: SNat 21846) (SNat :: SNat 16384)
 
 machine15S :: forall dom .
   ( KnownDomain dom
@@ -982,7 +976,7 @@ machine15S :: forall dom .
   => Memory 16 15
   -> Signal dom (NumFormat 16)
   -> Signal dom (Screen 4 4 8)
-machine15S = machine (SNat :: SNat 21846) (SNat :: SNat 16384) (SNat :: SNat 4) (SNat :: SNat 4) (SNat :: SNat 8)
+machine15S = machine (SNat :: SNat 21846) (SNat :: SNat 16384)
 
 machine16 :: forall dom .
   ( KnownDomain dom
@@ -993,7 +987,7 @@ machine16 :: forall dom .
   => Memory 17 16
   -> Signal dom (NumFormat 17)
   -> Signal dom (Screen 5 6 7)
-machine16 = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 6) (SNat :: SNat 7)
+machine16 = machine (SNat :: SNat 43691) (SNat :: SNat 32768)
 
 machine16S :: forall dom .
   ( KnownDomain dom
@@ -1004,7 +998,7 @@ machine16S :: forall dom .
   => Memory 17 16
   -> Signal dom (NumFormat 17)
   -> Signal dom (Screen 5 5 8)
-machine16S = machine (SNat :: SNat 43691) (SNat :: SNat 32768) (SNat :: SNat 5) (SNat :: SNat 5) (SNat :: SNat 8)
+machine16S = machine (SNat :: SNat 43691) (SNat :: SNat 32768)
 
 machine17 :: forall dom .
   ( KnownDomain dom
@@ -1015,7 +1009,7 @@ machine17 :: forall dom .
   => Memory 18 17
   -> Signal dom (NumFormat 18)
   -> Signal dom (Screen 7 8 7)
-machine17 = machine (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 7) (SNat :: SNat 8) (SNat :: SNat 7)
+machine17 = machine (SNat :: SNat 87382) (SNat :: SNat 65536)
 
 machine17S :: forall dom .
   ( KnownDomain dom
@@ -1026,7 +1020,7 @@ machine17S :: forall dom .
   => Memory 18 17
   -> Signal dom (NumFormat 18)
   -> Signal dom (Screen 6 6 8)
-machine17S = machine (SNat :: SNat 87382) (SNat :: SNat 65536) (SNat :: SNat 6) (SNat :: SNat 6) (SNat :: SNat 8)
+machine17S = machine (SNat :: SNat 87382) (SNat :: SNat 65536)
 
 
 machine18 :: forall dom .
@@ -1038,7 +1032,7 @@ machine18 :: forall dom .
   => Memory 19 18
   -> Signal dom (NumFormat 19)
   -> Signal dom (Screen 8 9 7)
-machine18 = machine (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 8) (SNat :: SNat 9) (SNat :: SNat 7)
+machine18 = machine (SNat :: SNat 174763) (SNat :: SNat 131072)
 
 machine18S :: forall dom .
   ( KnownDomain dom
@@ -1049,7 +1043,7 @@ machine18S :: forall dom .
   => Memory 19 18
   -> Signal dom (NumFormat 19)
   -> Signal dom (Screen 7 7 8)
-machine18S = machine (SNat :: SNat 174763) (SNat :: SNat 131072) (SNat :: SNat 7) (SNat :: SNat 7) (SNat :: SNat 8)
+machine18S = machine (SNat :: SNat 174763) (SNat :: SNat 131072)
 
 topEntity16
   :: Clock System
@@ -1067,5 +1061,5 @@ topEntity
   -> Memory 5 4
   -> Signal System (NumFormat 5)
   -> Signal System (Screen 1 1 1)
-topEntity = exposeClockResetEnable testMachine4S
+topEntity = exposeClockResetEnable machine4S
 
